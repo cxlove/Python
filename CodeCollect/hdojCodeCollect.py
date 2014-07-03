@@ -1,4 +1,6 @@
 ﻿#-*-coding:utf-8-*-
+#by cxlove
+
 import re
 import urllib
 import urllib2
@@ -7,17 +9,17 @@ import cookielib
 import sys
 import string 
 
-class POJLogin :
+class HDOJLogin :
 	'''
-	登录POJ
+	登录HDOJ
 	'''
 	def __init__ (self , user , password) :
-		self.hosturl = r'http://poj.org/problemlist'
-		self.posturl = r'http://poj.org/login'
-		self.headers = {'User-Agent':'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:29.0) Gecko/20100101 Firefox/29.0' , 'Refer': 'http://poj.org/'}
+		self.hosturl = r'http://acm.hdu.edu.cn/'
+		self.posturl = r'http://acm.hdu.edu.cn/userloginex.php?action=login'
+		self.headers = {'User-Agent':'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:29.0) Gecko/20100101 Firefox/29.0' , 'Refer': 'http://acm.hdu.edu.cn/'}
 		self.user = user
 		self.password = password
-		self.postData = {'user_id1' : self.user , 'password1' : self.password , 'B1': 'login' , 'url' : '/'}
+		self.postData = {'username' : self.user , 'userpass' : self.password , 'login': 'Sign In'}
         
 	def main (self) :
 		cj = cookielib.LWPCookieJar() 
@@ -31,6 +33,7 @@ class POJLogin :
 
 class Spider :
 	'''
+	爬虫
 	'''
 	def __init__ (self , user , password) :
 		self.user = user
@@ -38,42 +41,43 @@ class Spider :
 		self.main ()
 
 	def login (self) :
-		self.pojlogin = POJLogin (self.user , self.password)
-		self.pojlogin.main ()
+		self.hdojlogin = HDOJLogin (self.user , self.password)
+		self.hdojlogin.main ()
 
 	def HTMLtoID (self , html) :
-		rule = r'<td>(\d{7,8})</td>'
+		rule = r'px>(\d{6,8})</td>'
 		st = re.compile (rule)
 		return re.findall (st , html)
 
 	def getRealCode(self , html):
-		rule = r'style="font-family:Courier New,Courier,monospace">([\d\D]*)</pre>'
+		rule = r':none;text-align:left;">([\d\D]*)</textarea>'
 		re.compile(rule)
-		return re.findall(rule,html)
+		code = re.findall(rule,html)
+		return code[0]
 
 	def getSolutionID (self) :
 		ID = []
 		Last = 111111111   
 		while True :
-			url = 'http://poj.org/status?user_id=' + self.user + '&result=0&language=&top=' + str (Last)
+			url = 'http://acm.hdu.edu.cn/status.php?first=' + str (Last - 1) + '&pid=&user=' + self.user + '&lang=0&status=5'
 			request = urllib2.Request (url)
 			response = urllib2.urlopen (request)
 			html = response.read ()
 			thispage = self.HTMLtoID (html)
 			if len (thispage) == 0 :
 				break 
-			Last = thispage[-1]
+			Last = int (thispage[-1])
 			ID = ID + thispage
 		return ID
 
 	def getProblemID (self , html) :
-		rule = r'>(\d{4})<'
+		rule = r'target=_blank>(\d{4}) '
 		st = re.compile (rule)
 		problem = re.findall (st , html)
 		return problem[0]
 
 	def getLangluage (self , html) :
-		rule = r'Language:</b> ([\D]*)</td><td width=10px>'
+		rule = r'Language : ([\D]*)&nbsp;&nbsp;&nbsp;&nbsp;Author'
 		st = re.compile (rule)
 		language = re.findall (st , html)
 		if language[0] == 'G++' or language[0] == 'C++' : return '.cpp'
@@ -84,18 +88,25 @@ class Spider :
 	def getCode (self , AcceptID) :
 		dic = [0 for i in range (10000)]
 		for ID in AcceptID :
-			url = 'http://poj.org/showsource?solution_id=' + ID
+			url = 'http://acm.hdu.edu.cn/viewcode.php?rid=' + ID
 			page = urllib2.urlopen (urllib2.Request (url))
 			file = page.read ()
-			txt = self.getRealCode (HTMLParser.HTMLParser ().unescape (file))
+			txt = self.getRealCode (HTMLParser.HTMLParser ().unescape (file.decode ('gbk')))
 			problemID = self.getProblemID (file)
 			dic[int (problemID)] += 1
-			name = 'poj_' + problemID
+			name = 'hdoj_' + problemID
 			if dic[int (problemID)] != 1 :
 				name = name + '_' + str (dic[int (problemID)])
 			with open (name + self.getLangluage (file) , 'w') as out :
-				for line in txt:
-					out.write (line)
+				pre = 0
+				for line in txt :
+					if line.strip () or line == ' ':
+						out.write (line)
+						pre = 0
+					else :
+						if pre == 0 : 
+							out.write (line)
+						pre = 1
 
 	def main (self) :
 		self.login ()
@@ -106,5 +117,5 @@ class Spider :
 if __name__ == '__main__' :
 	reload(sys)
 	sys.setdefaultencoding('utf8')
-	poj = Spider ('pythontest' , '123456')
+	hdoj = Spider ('pythontest' , '123456')
 
